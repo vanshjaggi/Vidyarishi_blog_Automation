@@ -45,6 +45,8 @@ class VidyarishiGui:
         self.run_summary = tk.StringVar(value="No run has completed yet.")
 
         self._build_ui()
+        self.load_run_history(select_tab=False)
+        self.load_output_paths(select_tab=False)
         self.root.after(100, self._poll_output)
 
     def _build_ui(self):
@@ -214,10 +216,14 @@ class VidyarishiGui:
 
         self.notebook = ttk.Notebook(status_card)
         self.notebook.pack(fill="both", expand=True)
-        self.outputs_text = self._summary_text(self.notebook)
-        self.history_text = self._summary_text(self.notebook)
-        self.notebook.add(self.outputs_text, text="Outputs")
-        self.notebook.add(self.history_text, text="History")
+        self.outputs_tab = ttk.Frame(self.notebook)
+        self.history_tab = ttk.Frame(self.notebook)
+        self.outputs_text = self._summary_text(self.outputs_tab)
+        self.history_text = self._summary_text(self.history_tab)
+        self.outputs_text.pack(fill="both", expand=True)
+        self.history_text.pack(fill="both", expand=True)
+        self.notebook.add(self.outputs_tab, text="Outputs")
+        self.notebook.add(self.history_tab, text="History")
 
     def _metric(self, parent, label, variable):
         frame = ttk.Frame(parent, style="Card.TFrame", padding=14)
@@ -383,7 +389,7 @@ class VidyarishiGui:
         else:
             self.elapsed.set(f"{minutes:02d}:{seconds:02d}")
 
-    def load_output_paths(self):
+    def load_output_paths(self, select_tab=True):
         sections = [
             ("Confirmed", vidyarishi_login.CONFIRMED_BLOGS_OUTPUT_PATH),
             ("Skipped", vidyarishi_login.SKIPPED_BLOGS_OUTPUT_PATH),
@@ -398,7 +404,8 @@ class VidyarishiGui:
             count = len([line for line in content.splitlines() if line.strip()])
             chunks.append(f"{label} ({count})\n{content or '-'}")
         self.write_rich_text(self.outputs_text, "\n\n".join(chunks))
-        self.notebook.select(self.outputs_text)
+        if select_tab:
+            self.notebook.select(self.outputs_tab)
 
     def read_run_history(self):
         path = vidyarishi_login.RUN_HISTORY_PATH
@@ -416,7 +423,7 @@ class VidyarishiGui:
                     continue
         return records
 
-    def load_run_history(self):
+    def load_run_history(self, select_tab=True):
         records = self.read_run_history()
         if not records:
             content = "No run history yet."
@@ -461,7 +468,10 @@ class VidyarishiGui:
             content = "\n".join(lines)
 
         self.write_rich_text(self.history_text, content)
-        self.notebook.select(self.history_text)
+        if records:
+            self.run_summary.set(self.summary_card_text(records[-1]))
+        if select_tab:
+            self.notebook.select(self.history_tab)
 
     def write_rich_text(self, widget, content):
         widget.configure(state="normal")
