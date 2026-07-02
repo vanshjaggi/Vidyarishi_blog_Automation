@@ -1,0 +1,31 @@
+# Secrets and local config
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Selenium / browser local state
+.selenium-chrome-profile/
+vidyarishi-chrome-*/
+
+# Run outputs and local history
+confirmed_blogs.csv
+skipped_blogs.csv
+failed_blogs.csv
+run_history.jsonl
+
+# Logs
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+~$*
