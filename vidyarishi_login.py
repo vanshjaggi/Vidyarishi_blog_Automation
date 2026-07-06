@@ -54,6 +54,7 @@ BLOG_CONTENT_PATH = os.path.abspath(
 )
 THUMBNAIL_PATH = os.path.abspath(os.path.join("public", "thumbnail mba.jpg"))
 PAUSE_BEFORE_NEXT_SUBMIT = False
+IN_GUI_MODE = False
 
 
 class DuplicateBlogError(RuntimeError):
@@ -1035,11 +1036,13 @@ def submit_for_review(wait, browser):
     try:
         result = WebDriverWait(browser, 25).until(submitted)
         if result == "error":
+            visible_errors = get_submit_errors(browser)
             print_submit_errors(browser)
             print_recent_blog_api_failures(browser)
             api_message = latest_blog_api_error_message(browser)
-            if "same title and slug already exists" in api_message.lower():
-                raise DuplicateBlogError(api_message)
+            combined_error = "\n".join(visible_errors + [api_message]).lower()
+            if "same title and slug already exists" in combined_error:
+                raise DuplicateBlogError(api_message or "\n".join(visible_errors))
             raise RuntimeError("Submit failed: the website showed an error.")
         print("Submitted for review.")
     except TimeoutException:
@@ -1811,11 +1814,12 @@ def create_blogs(browser):
         f"elapsed={elapsed_seconds:.1f}s, average={average_seconds:.1f}s/blog, "
         f"success={success_rate:.1f}%."
     )
-    input("Press Enter here when you want to close the script...")
+    if not IN_GUI_MODE:
+        input("Press Enter here when you want to close the script...")
 
 
 def main():
-    load_dotenv()
+    load_dotenv(override=True)
 
     username = env_value("VIDYARISHI_USERNAME", "USERNAME", "EMAIL", "PHONE")
     password = env_value("VIDYARISHI_PASSWORD", "PASSWORD")

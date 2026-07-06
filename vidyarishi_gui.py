@@ -11,6 +11,9 @@ from tkinter import scrolledtext, ttk
 import vidyarishi_login
 
 
+APP_ICON_PATH = os.path.abspath("vidyarishi_blog_studio.ico")
+
+
 class QueueWriter:
     def __init__(self, output_queue):
         self.output_queue = output_queue
@@ -26,15 +29,21 @@ class QueueWriter:
 class VidyarishiGui:
     def __init__(self, root):
         self.root = root
-        self.root.title("Vidyarishi Blog Runner")
+        self.root.title("Vidyarishi Blog Studio")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                self.root.iconbitmap(APP_ICON_PATH)
+            except tk.TclError:
+                pass
         self.root.geometry("1120x720")
-        self.root.minsize(920, 620)
+        self.root.minsize(760, 540)
 
         self.output_queue = queue.Queue()
         self.input_queue = queue.Queue()
         self.worker = None
         self.run_started_at = None
         self.awaiting_action = False
+        self.compact_layout = False
 
         self.submitted = tk.IntVar(value=0)
         self.skipped = tk.IntVar(value=0)
@@ -134,12 +143,12 @@ class VidyarishiGui:
         self._metric(metrics, "Failed", self.failed).pack(side="left", fill="x", expand=True, padx=10)
         self._metric(metrics, "Elapsed", self.elapsed).pack(side="left", fill="x", expand=True, padx=(10, 0))
 
-        body = ttk.Frame(outer)
-        body.pack(fill="both", expand=True)
+        self.body = ttk.Frame(outer)
+        self.body.pack(fill="both", expand=True)
 
-        log_card = ttk.Frame(body, style="Card.TFrame", padding=10)
-        log_card.pack(side="left", fill="both", expand=True, padx=(0, 12))
-        log_header = ttk.Frame(log_card, style="Card.TFrame")
+        self.log_card = ttk.Frame(self.body, style="Card.TFrame", padding=10)
+        self.log_card.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        log_header = ttk.Frame(self.log_card, style="Card.TFrame")
         log_header.pack(fill="x")
         ttk.Label(log_header, text="Live Logs", background="#ffffff", font=("Segoe UI", 12, "bold")).pack(side="left")
         ttk.Label(
@@ -150,7 +159,7 @@ class VidyarishiGui:
             font=("Segoe UI", 9),
         ).pack(side="right")
         self.log = scrolledtext.ScrolledText(
-            log_card,
+            self.log_card,
             wrap="word",
             height=25,
             font=("Consolas", 10),
@@ -168,10 +177,10 @@ class VidyarishiGui:
         self.log.tag_configure("muted", foreground="#94a3b8")
         self.log.configure(state="disabled")
 
-        side = ttk.Frame(body)
-        side.pack(side="right", fill="y")
+        self.side = ttk.Frame(self.body)
+        self.side.pack(side="right", fill="y")
 
-        prompt_card = ttk.Frame(side, style="Card.TFrame", padding=14)
+        prompt_card = ttk.Frame(self.side, style="Card.TFrame", padding=14)
         prompt_card.pack(fill="x")
         ttk.Label(prompt_card, text="Action Center", background="#ffffff", font=("Segoe UI", 12, "bold")).pack(anchor="w")
         ttk.Label(
@@ -199,7 +208,7 @@ class VidyarishiGui:
         self.debug_button.pack(fill="x", pady=3)
         self.set_action_buttons(False)
 
-        status_card = ttk.Frame(side, style="Card.TFrame", padding=14)
+        status_card = ttk.Frame(self.side, style="Card.TFrame", padding=14)
         status_card.pack(fill="both", expand=True, pady=(12, 0))
         ttk.Label(status_card, text="Run Summary", background="#ffffff", font=("Segoe UI", 12, "bold")).pack(anchor="w")
         ttk.Label(status_card, textvariable=self.status, background="#ffffff", foreground="#334155", wraplength=310).pack(
@@ -224,12 +233,32 @@ class VidyarishiGui:
         self.history_text.pack(fill="both", expand=True)
         self.notebook.add(self.outputs_tab, text="Outputs")
         self.notebook.add(self.history_tab, text="History")
+        self.root.bind("<Configure>", self.apply_responsive_layout)
 
     def _metric(self, parent, label, variable):
         frame = ttk.Frame(parent, style="Card.TFrame", padding=14)
         ttk.Label(frame, textvariable=variable, style="Metric.TLabel").pack(anchor="w")
         ttk.Label(frame, text=label, style="MetricName.TLabel").pack(anchor="w")
         return frame
+
+    def apply_responsive_layout(self, event=None):
+        if event is not None and event.widget is not self.root:
+            return
+
+        should_compact = self.root.winfo_width() < 980
+        if should_compact == self.compact_layout:
+            return
+
+        self.compact_layout = should_compact
+        self.log_card.pack_forget()
+        self.side.pack_forget()
+
+        if should_compact:
+            self.side.pack(side="top", fill="x", pady=(0, 10))
+            self.log_card.pack(side="top", fill="both", expand=True)
+        else:
+            self.log_card.pack(side="left", fill="both", expand=True, padx=(0, 12))
+            self.side.pack(side="right", fill="y")
 
     def _summary_text(self, parent):
         text = scrolledtext.ScrolledText(
@@ -259,6 +288,9 @@ class VidyarishiGui:
         self.worker.start()
 
     def answer(self, value):
+        if self.awaiting_action and value != "debug":
+            self.awaiting_action = False
+            self.set_action_buttons(False)
         self.input_queue.put(value)
 
     def pause_note(self):
@@ -283,6 +315,7 @@ class VidyarishiGui:
         writer = QueueWriter(self.output_queue)
         vidyarishi_login.sys.stdout = writer
         vidyarishi_login.sys.stderr = writer
+        vidyarishi_login.IN_GUI_MODE = True
         try:
             vidyarishi_login.main()
             self.output_queue.put(("done", "Run complete."))
@@ -292,6 +325,7 @@ class VidyarishiGui:
             builtins.input = original_input
             vidyarishi_login.sys.stdout = original_stdout
             vidyarishi_login.sys.stderr = original_stderr
+            vidyarishi_login.IN_GUI_MODE = False
 
     def _poll_output(self):
         while True:

@@ -94,6 +94,14 @@ You can also edit places from the GUI using **Edit Places**.
 
 Recommended:
 
+Double-click:
+
+```text
+Vidyarishi Blog Studio.lnk
+```
+
+Or run from CMD:
+
 ```cmd
 python vidyarishi_gui.py
 ```
